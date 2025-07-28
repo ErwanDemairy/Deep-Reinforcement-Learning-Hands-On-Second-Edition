@@ -1,4 +1,4 @@
-import gym
+import gymnasium as gym
 from typing import TypeVar
 import random
 
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     total_reward = 0.0
 
     while True:
-        obs, reward, done, _ = env.step(0)
+        obs, reward, done, _, _ = env.step(0)
         total_reward += reward
         if done:
             break
