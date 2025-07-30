@@ -38,12 +38,16 @@ def iterate_batches(env, net, batch_size):
     obs, _ = env.reset()
     sm = nn.Softmax(dim=1)
     while True:
+
+        # compute the action for next step using the current nn.
         obs_v = torch.FloatTensor( [obs]) 
         result_v = net(obs_v)
         act_probs_v = sm( result_v )
         act_probs = act_probs_v.data.numpy()[0]
         action = np.random.choice(len(act_probs), p=act_probs)
+
         next_obs, reward, is_done, _, _ = env.step(action)
+
         episode_reward += reward
         step = EpisodeStep(observation=obs, action=action)
         episode_steps.append(step)
@@ -78,8 +82,9 @@ def filter_batch(batch, percentile):
 
 
 if __name__ == "__main__":
-    env = gym.make("CartPole-v0")
-    # env = gym.wrappers.Monitor(env, directory="mon", force=True)
+    env = gym.make("CartPole-v0", render_mode = "rgb_array")
+    trigger = lambda t: t % 10 == 0
+    env =  gym.wrappers.RecordVideo( env, video_folder="mon", episode_trigger=trigger )
     obs_size = env.observation_space.shape[0]
     n_actions = env.action_space.n
 
@@ -102,7 +107,7 @@ if __name__ == "__main__":
         writer.add_scalar("loss", loss_v.item(), iter_no)
         writer.add_scalar("reward_bound", reward_b, iter_no)
         writer.add_scalar("reward_mean", reward_m, iter_no)
-        if reward_m > 199:
+        if reward_m > 1000:
             print("Solved!")
             break
     writer.close()
