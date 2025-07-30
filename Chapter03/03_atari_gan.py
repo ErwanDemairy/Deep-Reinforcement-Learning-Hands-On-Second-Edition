@@ -10,13 +10,14 @@ from tensorboardX import SummaryWriter
 
 import torchvision.utils as vutils
 
-import gym
-import gym.spaces
+import gymnasium as gym
+import ale_py
+gym.register_envs(ale_py)
 
 import numpy as np
 
 log = gym.logger
-log.set_level(gym.logger.INFO)
+# log.set_level(gym.logger.INFO)
 
 LATENT_VECTOR_SIZE = 100
 DISCR_FILTERS = 64
@@ -121,15 +122,21 @@ def iterate_batches(envs, batch_size=BATCH_SIZE):
 
     while True:
         e = next(env_gen)
-        obs, reward, is_done, _ = e.step(e.action_space.sample())
+        obs, reward, is_done, is_truncated, _ = e.step(e.action_space.sample())
         if np.mean(obs) > 0.01:
             batch.append(obs)
         if len(batch) == batch_size:
             # Normalising input between -1 to 1
-            batch_np = np.array(batch, dtype=np.float32) * 2.0 / 255.0 - 1.0
-            yield torch.tensor(batch_np)
-            batch.clear()
-        if is_done:
+            try:
+                batch_np = np.array(batch, dtype=np.float32) * 2.0 / 255.0 - 1.0
+                yield torch.tensor(batch_np)
+                batch.clear()
+            except:
+                print("An exception occurred")
+                batch.clear()
+        if is_truncated:
+            print("is_truncated")
+        if is_done or is_truncated:
             e.reset()
 
 
@@ -138,12 +145,23 @@ if __name__ == "__main__":
     parser.add_argument(
         "--cuda", default=False, action='store_true',
         help="Enable cuda computation")
+    parser.add_argument(
+        "--mps", default=False, action='store_true',
+        help="Enable mps computation")
     args = parser.parse_args()
 
-    device = torch.device("cuda" if args.cuda else "cpu")
+ 
+    if args.mps:
+        device = torch.device("mps")
+    elif args.cuda:
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+    print(f"device = {device}")
     envs = [
         InputWrapper(gym.make(name))
-        for name in ('Breakout-v0', 'AirRaid-v0', 'Pong-v0')
+        for name in ('ALE/Breakout-v5',)
+        # for name in ('ALE/Breakout-v5', 'ALE/AirRaid-v5', 'ALE/Pong-v5')
     ]
     input_shape = envs[0].observation_space.shape
 
@@ -195,7 +213,7 @@ if __name__ == "__main__":
 
         iter_no += 1
         if iter_no % REPORT_EVERY_ITER == 0:
-            log.info("Iter %d: gen_loss=%.3e, dis_loss=%.3e",
+            log.warn("Iter %d: gen_loss=%.3e, dis_loss=%.3e",
                      iter_no, np.mean(gen_losses),
                      np.mean(dis_losses))
             writer.add_scalar(
