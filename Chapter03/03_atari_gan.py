@@ -213,9 +213,10 @@ if __name__ == "__main__":
 
         iter_no += 1
         if iter_no % REPORT_EVERY_ITER == 0:
-            log.warn("Iter %d: gen_loss=%.3e, dis_loss=%.3e",
+            print("Iter %d: gen_loss=%.3e, dis_loss=%.3e" % (
                      iter_no, np.mean(gen_losses),
                      np.mean(dis_losses))
+            )
             writer.add_scalar(
                 "gen_loss", np.mean(gen_losses), iter_no)
             writer.add_scalar(

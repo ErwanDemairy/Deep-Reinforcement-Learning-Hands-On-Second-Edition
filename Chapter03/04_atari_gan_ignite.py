@@ -12,13 +12,13 @@ from ignite.contrib.handlers import tensorboard_logger as tb_logger
 
 import torchvision.utils as vutils
 
-import gym
-import gym.spaces
+import gymnasium as gym
+import ale_py
+gym.register_envs(ale_py)
 
 import numpy as np
 
 log = gym.logger
-log.set_level(gym.logger.INFO)
 
 LATENT_VECTOR_SIZE = 100
 DISCR_FILTERS = 64
@@ -115,12 +115,12 @@ class Generator(nn.Module):
 
 
 def iterate_batches(envs, batch_size=BATCH_SIZE):
-    batch = [e.reset() for e in envs]
+    batch = [e.reset()[0] for e in envs]
     env_gen = iter(lambda: random.choice(envs), None)
 
     while True:
         e = next(env_gen)
-        obs, reward, is_done, _ = e.step(e.action_space.sample())
+        obs, reward, is_done, _, _ = e.step(e.action_space.sample())
         if np.mean(obs) > 0.01:
             batch.append(obs)
         if len(batch) == batch_size:
@@ -135,10 +135,18 @@ def iterate_batches(envs, batch_size=BATCH_SIZE):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda computation")
+    parser.add_argument( "--mps", default=False, action='store_true', help="Enable mps computation")
     args = parser.parse_args()
 
-    device = torch.device("cuda" if args.cuda else "cpu")
-    envs = [InputWrapper(gym.make(name)) for name in ('Breakout-v0', 'AirRaid-v0', 'Pong-v0')]
+    if args.mps:
+        device = torch.device("mps")
+    elif args.cuda:
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+    print(f"device = {device}")
+
+    envs = [InputWrapper(gym.make(name)) for name in ('ALE/Breakout-v5', 'ALE/AirRaid-v5', 'ALE/Pong-v5')]
     input_shape = envs[0].observation_space.shape
 
     net_discr = Discriminator(input_shape=input_shape).to(device)
@@ -203,9 +211,10 @@ if __name__ == "__main__":
     @engine.on(Events.ITERATION_COMPLETED)
     def log_losses(trainer):
         if trainer.state.iteration % REPORT_EVERY_ITER == 0:
-            log.info("%d: gen_loss=%f, dis_loss=%f",
+            print("%d: gen_loss=%f, dis_loss=%f" % (
                      trainer.state.iteration,
                      trainer.state.metrics['avg_loss_gen'],
                      trainer.state.metrics['avg_loss_dis'])
+            )
 
     engine.run(data=iterate_batches(envs))
