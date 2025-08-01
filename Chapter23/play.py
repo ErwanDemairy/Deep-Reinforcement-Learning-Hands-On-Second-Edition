@@ -17,8 +17,15 @@ if __name__ == "__main__":
     parser.add_argument("models", nargs='+', help="The list of models (at least 2) to play against each other")
     parser.add_argument("-r", "--rounds", type=int, default=2, help="Count of rounds to perform for every pair")
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable CUDA")
+    parser.add_argument("--mps", default=False, action="store_true", help="Enable mps computation")
     args = parser.parse_args()
-    device = torch.device("cuda" if args.cuda else "cpu")
+    if args.mps:
+        device = torch.device("mps")
+    elif args.cuda:
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+    print(f"device = {device}")
 
     nets = []
     for fname in args.models:
